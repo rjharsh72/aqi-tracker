@@ -4,6 +4,9 @@ const passwordInput = document.getElementById('password');
 const loginContainer = document.getElementById('login-container');
 const dashboardContainer = document.getElementById('dashboard-container');
 const mapContainer = document.getElementById('map');
+const API_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5000' 
+  : 'https://aqi-tracker-1.onrender.com';
 
 let token = '';
 let map = null;
@@ -18,7 +21,7 @@ loginForm.addEventListener('submit', async (e) => {
 
   try {
    // const response = await fetch('http://localhost:5000/login', 
-   const response = await fetch('https://aqi-tracker-1.onrender.com',{
+   const response = await fetch(`${API_URL}/login`,{
       
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -103,7 +106,7 @@ async function loadMapData() {
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     //const response = await fetch('http://localhost:5000/getAqiData', {
-    const response = await fetch('https://aqi-tracker-1.onrender.com', {
+    const response = await fetch(`${API_URL}/getAqiData`, {
       headers: { 'Authorization': `Bearer ${token}` },
       signal: controller.signal
     });
