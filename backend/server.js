@@ -9,7 +9,9 @@ const app = express();
 const JWT_SECRET = 'your-secret-key';
 
 app.use(cors({
-    origin: 'https://aqi-tracker-2.onrender.com/' // Replace with your frontend URL
+    origin: process.env.NODE_ENV === 'production' 
+    ? 'https://aqi-tracker-2.onrender.com/' 
+    : '*' // Replace with your frontend URL
   }));
 app.use(express.json());
 
