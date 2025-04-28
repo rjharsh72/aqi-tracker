@@ -8,7 +8,9 @@ const fs = require('fs');
 const app = express();
 const JWT_SECRET = 'your-secret-key';
 
-app.use(cors());
+app.use(cors({
+    origin: 'https://aqi-tracker-2.onrender.com/' // Replace with your frontend URL
+  }));
 app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
