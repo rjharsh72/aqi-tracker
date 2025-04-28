@@ -6,7 +6,7 @@ const dashboardContainer = document.getElementById('dashboard-container');
 const mapContainer = document.getElementById('map');
 const API_URL = window.location.hostname === 'localhost' 
   ? 'http://localhost:5000' 
-  : 'https://aqi-tracker-1.onrender.com';
+  : 'https://aqi-tracker-backend.onrender.com';
 
 let token = '';
 let map = null;
