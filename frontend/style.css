@@ -1,0 +1,146 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f4f4f9;
+  }
+  
+  .container {
+    width: 85%;
+    max-width: 900px;
+    margin: 20px;
+    padding: 25px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  }
+  
+  h2 {
+    color: #2c3e50;
+    margin-top: 0;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  
+  p {
+    color: #7f8c8d;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  #map {
+    height: 500px;
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+    margin-top: 15px;
+    z-index: 1; /* Ensure proper z-index for map controls */
+  }
+  
+  input, button {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 16px;
+  }
+  
+  input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+  }
+  
+  button {
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.3s;
+    border: none;
+  }
+  
+  button:hover {
+    background-color: #45a049;
+  }
+  
+  #map-controls {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  
+  #refresh-data {
+    width: auto;
+    margin-right: 15px;
+  }
+  
+  #last-updated {
+    font-size: 14px;
+    color: #7f8c8d;
+  }
+  
+  .form-hint {
+    font-size: 12px;
+    color: #95a5a6;
+    text-align: right;
+    margin-top: -5px;
+  }
+  
+  /* Error and success messages */
+  .error-message, .success-message {
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .error-message {
+    color: #721c24;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+  }
+  
+  .success-message {
+    color: #155724;
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+  }
+  
+  /* Legend styling */
+  .legend {
+    line-height: 18px;
+    color: #555;
+  }
+  
+  .legend h4 {
+    margin: 0 0 10px;
+    font-size: 16px;
+  }
+  
+  /* Loading indicator */
+  #loading-indicator {
+    padding: 12px 20px;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+  }
+  
+  /* Responsive design */
+  @media (max-width: 768px) {
+    .container {
+      width: 95%;
+      padding: 15px;
+    }
+    
+    #map {
+      height: 400px;
+    }
+  }
