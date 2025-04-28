@@ -17,7 +17,9 @@ loginForm.addEventListener('submit', async (e) => {
   const password = passwordInput.value;
 
   try {
-    const response = await fetch('http://localhost:5000/login', {
+   // const response = await fetch('http://localhost:5000/login', 
+   const response = await fetch('https://aqi-tracker-1.onrender.com',{
+      
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -100,7 +102,8 @@ async function loadMapData() {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch('http://localhost:5000/getAqiData', {
+    //const response = await fetch('http://localhost:5000/getAqiData', {
+    const response = await fetch('https://aqi-tracker-1.onrender.com', {
       headers: { 'Authorization': `Bearer ${token}` },
       signal: controller.signal
     });
