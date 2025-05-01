@@ -8,11 +8,9 @@ const fs = require('fs');
 const app = express();
 const JWT_SECRET = 'your-secret-key';
 
-app.use(cors({
-    origin: process.env.NODE_ENV === 'production' 
-    ? 'https://aqi-tracker-frontend.onrender.com' 
-    : '*' // Replace with your frontend URL
-  }));
+app.use(cors(
+    //{ origin: 'https://aqi-tracker-2.onrender.com/' // Replace with your frontend URL}
+));
 app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
@@ -23,8 +21,22 @@ const users = [{ username: 'admin', password: 'admin' }];
 // Cache for CSV data and geocoded locations to improve performance
 let csvDataCache = null;
 let csvLastFetched = null;
-const CSV_CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+const CSV_CACHE_TTL = 1 * 60 * 1000; // 1 minutes in milliseconds
 const geocodeCache = new Map();
+
+// Middleware to authenticate JWT token
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token == null) return res.sendStatus(401);
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+}
 
 // Login endpoint (basic, no password hashing for simplicity)
 app.post('/login', (req, res) => {
@@ -40,7 +52,7 @@ app.post('/login', (req, res) => {
   }
 });
 
-// Improved CSV fetching from Google Drive with caching
+// Modify the fetchCSV function to respect the shorter cache time
 async function fetchCSV() {
   // Check if we have valid cached data
   if (csvDataCache && csvLastFetched && (Date.now() - csvLastFetched < CSV_CACHE_TTL)) {
@@ -81,13 +93,20 @@ async function fetchCSV() {
   });
 }
 
-// Optimized geocoding with caching and parallel processing
+// Geocode location with caching
 async function geocodeLocation(location) {
-  // Check if location is already cached
+  // Check cache first
   if (geocodeCache.has(location)) {
+    console.log(`Using cached geocode for: ${location}`);
     return geocodeCache.get(location);
   }
+  
+  // If not in cache, fetch fresh data
+  return geocodeLocationFresh(location);
+}
 
+// Function to bypass the geocode cache when needed
+async function geocodeLocationFresh(location) {
   try {
     // Add shorter delay to avoid rate limiting but improve performance
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -109,7 +128,7 @@ async function geocodeLocation(location) {
         lng: parseFloat(locationData.lon) 
       };
       
-      // Cache the result
+      // Update the cache with the fresh result
       geocodeCache.set(location, result);
       return result;
     } else {
@@ -128,23 +147,18 @@ async function geocodeLocation(location) {
   }
 }
 
-// Middleware to verify JWT token
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token) return res.status(401).json({ message: 'No token provided' });
-  
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Invalid or expired token' });
-    req.user = user;
-    next();
-  });
-}
-
-// Optimized endpoint to get AQI data with batch processing and parallel geocoding
+// Updated getAqiData endpoint with refresh parameter
 app.get('/getAqiData', authenticateToken, async (req, res) => {
   try {
+    const forceRefresh = req.query.refresh === 'true';
+    
+    // Invalidate cache if force refresh requested
+    if (forceRefresh) {
+      csvDataCache = null;
+      csvLastFetched = null;
+      console.log('Cache cleared due to force refresh request');
+    }
+    
     console.log('Fetching CSV data...');
     const csvData = await fetchCSV();
     console.log(`Processing ${csvData.length} CSV entries`);
@@ -162,7 +176,14 @@ app.get('/getAqiData', authenticateToken, async (req, res) => {
           const locationName = entry['Location Name'];
           console.log(`Geocoding: ${locationName}`);
           
-          const geocode = await geocodeLocation(locationName);
+          // If force refresh is true, skip the geocode cache
+          let geocode;
+          if (forceRefresh) {
+            // Skip the cache and force new geocoding
+            geocode = await geocodeLocationFresh(locationName);
+          } else {
+            geocode = await geocodeLocation(locationName);
+          }
           
           return {
             customerName: entry['Customer Name'],
@@ -190,6 +211,20 @@ app.get('/getAqiData', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error in /getAqiData endpoint:', error);
     res.status(500).json({ message: 'Error fetching data', error: error.message });
+  }
+});
+
+// Add a dedicated endpoint to clear all caches
+app.post('/clearCache', authenticateToken, (req, res) => {
+  try {
+    geocodeCache.clear();
+    csvDataCache = null;
+    csvLastFetched = null;
+    console.log('All caches cleared via API request');
+    res.json({ message: 'Cache cleared successfully' });
+  } catch (error) {
+    console.error('Error clearing cache:', error);
+    res.status(500).json({ message: 'Error clearing cache', error: error.message });
   }
 });
 
