@@ -1,16 +1,21 @@
+// Global variables
 const loginForm = document.getElementById('login-form');
 const usernameInput = document.getElementById('username');
 const passwordInput = document.getElementById('password');
 const loginContainer = document.getElementById('login-container');
 const dashboardContainer = document.getElementById('dashboard-container');
 const mapContainer = document.getElementById('map');
-const API_URL = window.location.hostname === 'localhost' 
-  ? 'http://localhost:5000' 
-  : 'https://aqi-tracker-backend.onrender.com';
+const refreshButton = document.getElementById('refresh-data');
+const lastUpdatedSpan = document.getElementById('last-updated');
+const dataErrorDiv = document.getElementById('data-error');
+const dataSuccessDiv = document.getElementById('data-success');
+const REFRESH_INTERVAL = 0.2 * 60 * 1000;
 
 let token = '';
 let map = null;
 let isLoading = false;
+let lastUpdated = null;
+let autoRefreshInterval = null;
 
 // Handle Login
 loginForm.addEventListener('submit', async (e) => {
@@ -20,9 +25,8 @@ loginForm.addEventListener('submit', async (e) => {
   const password = passwordInput.value;
 
   try {
-   // const response = await fetch('http://localhost:5000/login', 
-   const response = await fetch(`${API_URL}/login`,{
-      
+     const response = await fetch('http://localhost:5000/login', {
+    //const response = await fetch('https://aqi-tracker-1.onrender.com/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -37,6 +41,7 @@ loginForm.addEventListener('submit', async (e) => {
 
       initializeMap();
       loadMapData();
+      startAutoRefresh();
     } else {
       alert(data.message || 'Login failed');
     }
@@ -44,6 +49,25 @@ loginForm.addEventListener('submit', async (e) => {
     console.error('Login error:', error);
     alert('Login failed. Server may be unavailable.');
   }
+});
+
+// Add this after successful login in your login form event listener
+function startAutoRefresh() {
+    // Clear any existing interval first
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+    }
+    
+    // Set up the new interval
+    autoRefreshInterval = setInterval(() => {
+      console.log('Auto-refreshing data...');
+      loadMapData(false); // Regular refresh, not force refresh
+    }, REFRESH_INTERVAL);
+  }
+
+// Refresh button event listener
+refreshButton.addEventListener('click', () => {
+  loadMapData(true); // Pass true to force refresh
 });
 
 // Initialize the Map
@@ -93,20 +117,31 @@ function removeLoadingIndicator() {
   }
 }
 
-// Load AQI Data and Place Pins FAST
-async function loadMapData() {
+// Load AQI Data and Place Pins
+async function loadMapData(forceRefresh = false) {
   if (isLoading) return;
   isLoading = true;
 
   console.log('Loading map data...');
   try {
     showLoadingIndicator();
+    
+    // Clear existing markers if we're refreshing
+    if (map && forceRefresh) {
+      map.eachLayer(layer => {
+        if (layer instanceof L.CircleMarker) {
+          map.removeLayer(layer);
+        }
+      });
+    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    //const response = await fetch('http://localhost:5000/getAqiData', {
-    const response = await fetch(`${API_URL}/getAqiData`, {
+    // Update the URL to include the forceRefresh query parameter
+    const refreshParam = forceRefresh ? '?refresh=true' : '';
+    //const response = await fetch(`https://aqi-tracker-1.onrender.com/getAqiData${refreshParam}`, {
+    const response = await fetch('http://localhost:5000/getAqiData', { 
       headers: { 'Authorization': `Bearer ${token}` },
       signal: controller.signal
     });
@@ -122,12 +157,14 @@ async function loadMapData() {
     console.log('Fetched AQI data:', data);
 
     if (!data || data.length === 0) {
-      alert('No AQI data available.');
+      showError('No AQI data available.');
       removeLoadingIndicator();
       return;
     }
 
-    const bounds = L.latLngBounds();
+    // Create a new bounds object
+    const bounds = new L.LatLngBounds();
+    let hasValidCoordinates = false;
 
     data.forEach(entry => {
       const { lat, lng, customerName, location, aqi, isDefaultLocation } = entry;
@@ -137,6 +174,17 @@ async function loadMapData() {
         return;
       }
 
+      // Make sure we're working with numbers
+      const latNum = parseFloat(lat);
+      const lngNum = parseFloat(lng);
+
+      if (isNaN(latNum) || isNaN(lngNum)) {
+        console.warn(`Invalid coordinate values for ${customerName} at ${location}`);
+        return;
+      }
+
+      hasValidCoordinates = true;
+
       let color;
       const aqiNum = parseInt(aqi);
       if (aqiNum <= 50) color = 'green';
@@ -145,7 +193,7 @@ async function loadMapData() {
       else if (aqiNum <= 200) color = 'red';
       else color = 'purple';
 
-      const marker = L.circleMarker([lat, lng], {
+      const marker = L.circleMarker([latNum, lngNum], {
         color: color,
         fillColor: color,
         fillOpacity: 0.6,
@@ -158,19 +206,42 @@ async function loadMapData() {
 
       marker.bindPopup(popupContent);
       marker.addTo(map);
-      bounds.extend([lat, lng]);
+      
+      // Add coordinates to bounds
+      bounds.extend([latNum, lngNum]);
     });
 
-    if (!bounds.isEmpty()) {
-      map.fitBounds(bounds, { padding: [50, 50] });
+    // Only fit bounds if we have valid coordinates
+    if (hasValidCoordinates) {
+      // Check if bounds is valid before using it
+      if (bounds.isValid && bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+      } else {
+        console.warn('Invalid bounds object, using default view');
+        map.setView([28.6139, 77.2090], 10); // Default to Delhi center
+      }
     }
 
-    addLegend();
+    // Only add legend if it doesn't exist already
+    if (!document.querySelector('.legend')) {
+      addLegend();
+    }
+    
+    // Update last updated timestamp
+    lastUpdated = new Date();
+    updateLastUpdatedDisplay();
+    
+    // Show success message if this was a manual refresh
+    if (forceRefresh) {
+      showSuccess('Data refreshed successfully!');
+    }
+    
     removeLoadingIndicator();
     console.log('All markers added and loading indicator removed.');
 
   } catch (error) {
     console.error('Error loading map data:', error);
+    showError(`Failed to load AQI data: ${error.message}`);
     removeLoadingIndicator();
   } finally {
     isLoading = false;
@@ -205,4 +276,29 @@ function addLegend() {
   };
 
   legend.addTo(map);
+}
+
+// Helper functions for UI messaging
+function showError(message) {
+  dataErrorDiv.textContent = message;
+  dataErrorDiv.style.display = 'block';
+  setTimeout(() => {
+    dataErrorDiv.style.display = 'none';
+  }, 5000); // Hide after 5 seconds
+}
+
+function showSuccess(message) {
+  dataSuccessDiv.textContent = message;
+  dataSuccessDiv.style.display = 'block';
+  setTimeout(() => {
+    dataSuccessDiv.style.display = 'none';
+  }, 5000); // Hide after 5 seconds
+}
+
+function updateLastUpdatedDisplay() {
+  if (lastUpdated) {
+    lastUpdatedSpan.textContent = `Last updated: ${lastUpdated.toLocaleTimeString()}`;
+  } else {
+    lastUpdatedSpan.textContent = '';
+  }
 }
